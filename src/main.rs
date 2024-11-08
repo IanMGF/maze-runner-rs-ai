@@ -115,11 +115,11 @@ async fn main() {
                 done = true;
                 
                 #[cfg(debug_assertions)]
-                debug!("Path found!");
+                println!("Path found!");
             }
             
             #[cfg(debug_assertions)]
-            debug!("Step time: {}", get_time() - step_start_time);
+            println!("Step time: {}", get_time() - step_start_time);
         }
 
         // Draw
@@ -205,7 +205,7 @@ async fn main() {
             next_frame().await;
             
             #[cfg(debug_assertions)]
-            debug!("Render time: {}", get_time() - render_start_time);
+            println!("Render time: {}", get_time() - render_start_time);
         }
         delta_time = get_time() - new_time;
     }
