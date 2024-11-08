@@ -10,16 +10,17 @@ use std::{env, fs};
 
 use macroquad::prelude::*;
 
-const STEP_DELAY: f64 = 0f64;
-const DRAW_DELAY: f64 = 1f64 / 60f64;
+const STEP_DELAY: f64 = 0.;
+const DRAW_DELAY: f64 = 1. / 60.;
 
 #[derive(PartialEq, Eq)]
 enum EmptyTileState {
     Focused,
     Visited,
+    Considering,
 }
 
-#[macroquad::main("Maze Runnerc")]
+#[macroquad::main("Maze Runner")]
 async fn main() {
     let args: Vec<String> = env::args().collect();
 
@@ -103,6 +104,10 @@ async fn main() {
                     }
                 });
                 
+                searcher.get_considered_nodes().iter().for_each(|node| {
+                    empty_tile_states.insert(node.get_coordinates(), EmptyTileState::Considering);
+                });
+                
                 searcher.get_current_path().expect("No more paths").iter().for_each(|node| {
                     empty_tile_states.insert(node.get_coordinates(), EmptyTileState::Focused);
                 });
@@ -137,9 +142,12 @@ async fn main() {
 
             // O(n^2)
             for x_idx in 0..maze.width() {
+                let mut streak: u16 = 1;
+                let mut streak_start: u16 = 0;
+                let mut streak_color: Option<Color> = None;
+                
                 for y_idx in 0..maze.height() {
                     let x_pos = x_offset + (x_idx as f32) * tile_size;
-                    let y_pos = y_offset + (y_idx as f32) * tile_size;
 
                     #[allow(clippy::expect_used)]
                     let tile = maze
@@ -147,20 +155,50 @@ async fn main() {
                         .expect("Empty node should not be accessible")
                         .get_tile();
 
-                    let color = match tile {
+                    let node_color: Option<Color> = match tile {
                         maze_runner_rs::tilemap::Tile::Empty => {
                             match empty_tile_states.get(&(x_idx, y_idx)) {
-                                None => continue,
-                                Some(EmptyTileState::Visited) => DARKBLUE,
-                                Some(EmptyTileState::Focused) => SKYBLUE,
+                                None => None,
+                                Some(EmptyTileState::Visited) => Some(SKYBLUE),
+                                Some(EmptyTileState::Focused) => Some(ORANGE),
+                                Some(EmptyTileState::Considering) => Some(RED),
                             }
                         }
-                        maze_runner_rs::tilemap::Tile::Wall => continue,
-                        maze_runner_rs::tilemap::Tile::Start => BLUE,
-                        maze_runner_rs::tilemap::Tile::End => GREEN,
+                        maze_runner_rs::tilemap::Tile::Wall => Some(WHITE),
+                        maze_runner_rs::tilemap::Tile::Start => Some(YELLOW),
+                        maze_runner_rs::tilemap::Tile::End => Some(GREEN),
                     };
 
-                    draw_rectangle(x_pos, y_pos, tile_size, tile_size, color);
+                    match (streak_color, node_color) {
+                        (None, new_color) => {
+                            streak = 1;
+                            streak_start = y_idx as u16;
+                            streak_color = new_color;
+                        }
+                        (Some(streak_col), Some(node_col)) if streak_col == node_col => {
+                            streak += 1;
+                        }
+                        (Some(streak_col), node_col_opt) if Some(streak_col) != node_col_opt => {
+                            let org_y = y_offset + streak_start as f32 * tile_size;
+                            draw_rectangle(x_pos, org_y, tile_size, tile_size * streak as f32, streak_col);
+                            
+                            streak_color = node_col_opt;
+                            streak = 1;
+                            streak_start = y_idx as u16;
+                        }
+                        (Some(_), _) => unreachable!("Invalid state"),
+                    }
+                }
+                
+                if let Some(color) = streak_color {
+                    let org_y = y_offset + streak_start as f32 * tile_size;
+                    draw_rectangle(
+                        x_offset + (x_idx as f32) * tile_size,
+                        org_y,
+                        tile_size,
+                        tile_size * streak as f32,
+                        color,
+                    );
                 }
             }
 

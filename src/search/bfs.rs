@@ -15,8 +15,8 @@ impl<'a> super::Searcher<'a> for BreadthFirstSearcher<'a> {
         self.0.front()
     }
     
-    fn get_considered_nodes(&self) -> Vec<&crate::maze::MazeNode<'a>> {
-        self.0.iter().filter_map(|path| path.last()).collect()
+    fn get_considered_nodes(&self) -> Vec<Box<crate::maze::MazeNode<'a>>> {
+        self.0.iter().filter_map(|path| path.last().map(|node| Box::new(node.clone()))).collect()
     }
 
     fn develop_next_node(&mut self) -> Option<crate::maze::MazeNode<'a>> {

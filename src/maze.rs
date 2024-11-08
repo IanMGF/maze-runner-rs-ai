@@ -10,12 +10,37 @@ pub struct MazeNode<'a> {
     coord: (usize, usize),
     maze: &'a Maze
 }
+
 pub struct Neighbours<'a> {
     pub up: Option<MazeNode<'a>>,
     pub left: Option<MazeNode<'a>>,
     pub down: Option<MazeNode<'a>>,
     pub right: Option<MazeNode<'a>>,
 }
+
+pub struct NeighboursIter<'a> (Neighbours<'a>);
+
+impl<'a> IntoIterator for Neighbours<'a> {
+    type Item = Box<MazeNode<'a>>;
+
+    type IntoIter = NeighboursIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        NeighboursIter(self)
+    }
+}
+
+impl<'a> Iterator for NeighboursIter<'a> {
+    type Item = Box<MazeNode<'a>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.up.take().map(Box::new)
+            .or(self.0.left.take().map(Box::new))
+            .or(self.0.down.take().map(Box::new))
+            .or(self.0.right.take().map(Box::new))
+    }
+}
+
 
 impl<'a> Maze {
     pub fn get_node(&'a self, coord: (usize, usize)) -> Option<MazeNode<'a>> {
