@@ -6,6 +6,7 @@ use maze_runner_rs::search::path::Path;
 use maze_runner_rs::search::Searcher;
 use maze_runner_rs::tilemap::TileMap;
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::{env, fs};
 
 use macroquad::prelude::*;
@@ -22,6 +23,7 @@ enum EmptyTileState {
 
 #[macroquad::main("Maze Runner")]
 async fn main() {
+    println!("Size of MazeNode: {}", std::mem::size_of::<MazeNode>());
     let args: Vec<String> = env::args().collect();
 
     let Some(filepath) = args.get(1) else {
@@ -41,7 +43,7 @@ async fn main() {
         return;
     };
 
-    let maze: Maze = tilemap.into();
+    let maze: Rc<Maze> = Rc::new(tilemap.into());
 
     let mut done = false;
     let mut new_time: f64;
@@ -52,25 +54,20 @@ async fn main() {
 
     let mut empty_tile_states: HashMap<(usize, usize), EmptyTileState> = HashMap::new();
 
-    let end_node = maze.get_end().clone();
     #[allow(clippy::expect_used)]
     let mut searcher = {
         let mut path = Path::new();
         path.push(maze.get_start());
         
-        #[allow(clippy::expect_used)]
         let algorithm: Box<dyn Searcher> = match algorithm_str.as_str() {
             "dfs" => Box::new(DepthFirstSearcher::new(path)),
             "bfs" => Box::new(BreadthFirstSearcher::new(path)),
             "a-star" => {
-                let heuristic: Box<dyn Fn(&MazeNode) -> u64> = Box::new(
-                    |node| (usize::abs_diff(
-                        node.get_coordinates().0, end_node.get_coordinates().0
-                    ) + usize::abs_diff(
-                        node.get_coordinates().1, end_node.get_coordinates().1
-                    )) as u64
+                let heuristic = Box::new(
+                    |node: &MazeNode, end_node: &MazeNode| 
+                    (Maze::manhattan_distance(node.get_coordinates(), end_node.get_coordinates())) as u64
                 );
-                Box::new(AStarSearcher::new(path, heuristic).expect("Failed to create A* searcher"))
+                Box::new(AStarSearcher::new(maze.clone(), path, heuristic).expect("Failed to create A* searcher"))
             },
             _ => {
                 eprintln!("Invalid algorithm");
@@ -86,40 +83,8 @@ async fn main() {
         // Step
         step_time += delta_time;
         if step_time >= STEP_DELAY && !done {
-            
-            #[cfg(debug_assertions)]
-            let step_start_time = get_time();
-            
-            step_time = 0f64;
-
-            let Some(node) = searcher.next() else {
-                panic!("No more nodes to search");
-            };
-
-            #[allow(clippy::expect_used)]
-            if node.get_tile() != maze_runner_rs::tilemap::Tile::End {
-                empty_tile_states.iter_mut().for_each(|(_, state)| {
-                    if *state == EmptyTileState::Focused {
-                        *state = EmptyTileState::Visited;
-                    }
-                });
-                
-                searcher.get_considered_nodes().iter().for_each(|node| {
-                    empty_tile_states.insert(node.get_coordinates(), EmptyTileState::Considering);
-                });
-                
-                searcher.get_current_path().expect("No more paths").iter().for_each(|node| {
-                    empty_tile_states.insert(node.get_coordinates(), EmptyTileState::Focused);
-                });
-            } else {
-                done = true;
-                
-                #[cfg(debug_assertions)]
-                println!("Path found!");
-            }
-            
-            #[cfg(debug_assertions)]
-            println!("Step time: {}", get_time() - step_start_time);
+            step_time = 0.;
+            done = step(&mut searcher, &mut empty_tile_states);   
         }
 
         // Draw
@@ -208,5 +173,40 @@ async fn main() {
             println!("Render time: {}", get_time() - render_start_time);
         }
         delta_time = get_time() - new_time;
+    }
+}
+
+fn step(searcher: &mut Box<dyn Searcher>, empty_tile_states: &mut HashMap<(usize, usize), EmptyTileState>) -> bool {
+    
+    #[cfg(debug_assertions)]
+    let step_start_time = get_time();
+
+    let Some(node) = searcher.next() else {
+        panic!("No more nodes to search");
+    };
+
+    #[allow(clippy::expect_used)]
+    if node.get_tile() != maze_runner_rs::tilemap::Tile::End {
+        empty_tile_states.iter_mut().for_each(|(_, state)| {
+            if *state == EmptyTileState::Focused {
+                *state = EmptyTileState::Visited;
+            }
+        });
+        
+        searcher.get_considered_nodes().iter().for_each(|node| {
+            empty_tile_states.insert(node.get_coordinates(), EmptyTileState::Considering);
+        });
+        
+        searcher.get_current_path().expect("No more paths").iter().for_each(|node| {
+            empty_tile_states.insert(node.get_coordinates(), EmptyTileState::Focused);
+        });
+        
+        #[cfg(debug_assertions)]
+        println!("Step time: {}", get_time() - step_start_time);
+        false
+    } else {
+        #[cfg(debug_assertions)]
+        println!("Path found!");
+        true
     }
 }

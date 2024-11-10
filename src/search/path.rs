@@ -3,33 +3,33 @@ use std::collections::{linked_list::Iter, LinkedList};
 use crate::maze::MazeNode;
 
 #[derive(Clone, Debug)]
-pub struct Path<'a>(LinkedList<MazeNode<'a>>);
-impl<'a> Path<'a> {
-    pub fn new() -> Path<'a> {
-        Path::<'a>(LinkedList::new())
+pub struct Path(LinkedList<MazeNode>);
+impl Path {
+    pub fn new() -> Path {
+        Path(LinkedList::new())
     }
     
-    pub fn push(&mut self, node: MazeNode<'a>) {
+    pub fn push(&mut self, node: MazeNode) {
         self.0.push_back(node);
     }
     
-    pub fn first(&self) -> Option<&MazeNode<'a>> {
+    pub fn first(&self) -> Option<&MazeNode> {
         self.0.front()
     }
     
-    pub fn last(&self) -> Option<&MazeNode<'a>> {
+    pub fn last(&self) -> Option<&MazeNode> {
         self.0.back()
     }
     
-    pub fn iter(&self) -> Iter<MazeNode<'_>> {
+    pub fn iter(&self) -> Iter<MazeNode> {
         self.0.iter()
     }
     
-    pub fn contains(&self, node: &MazeNode<'a>) -> bool {
+    pub fn contains(&self, node: &MazeNode) -> bool {
         self.0.contains(node)
     }
     
-    pub fn get_next(&self) -> Vec<MazeNode<'a>> {
+    pub fn get_next(&self) -> Vec<MazeNode> {
         let Some(node) = self.0.back() else {
             return vec![];
         };
@@ -44,14 +44,14 @@ impl<'a> Path<'a> {
         ].into_iter().flatten().filter(|node| !self.contains(node)).collect()
     }
     
-    pub fn deepen_path(self) -> Vec<Path<'a>> {
+    pub fn deepen_path(self) -> Vec<Path> {
         let Some(node) = self.0.back() else {
             return vec![self];
         };
         
         let neighbors = node.get_neighbors();
         
-        let next_nodes: Vec<MazeNode<'a>> = vec![
+        let next_nodes: Vec<MazeNode> = vec![
             neighbors.up,
             neighbors.left,
             neighbors.down,
@@ -69,7 +69,7 @@ impl<'a> Path<'a> {
     }
 }
 
-impl<'a> Default for Path<'a> {
+impl Default for Path {
     fn default() -> Self {
         Self::new()
     }

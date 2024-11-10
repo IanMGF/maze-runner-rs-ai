@@ -2,35 +2,35 @@ use std::collections::LinkedList;
 
 use super::{path::Path, Searcher};
 
-pub struct BreadthFirstSearcher<'a> (LinkedList<Path<'a>>);
+pub struct BreadthFirstSearcher (LinkedList<Path>);
 
-impl BreadthFirstSearcher<'_> {
-    pub fn new(initial_path: Path<'_>) -> BreadthFirstSearcher<'_> {
+impl BreadthFirstSearcher {
+    pub fn new(initial_path: Path) -> BreadthFirstSearcher {
         BreadthFirstSearcher([initial_path].into())
     }
 }
 
-impl<'a> super::Searcher<'a> for BreadthFirstSearcher<'a> {
-    fn get_current_path(&self) -> Option<&Path<'a>> {
+impl super::Searcher for BreadthFirstSearcher {
+    fn get_current_path(&self) -> Option<&Path> {
         self.0.front()
     }
     
-    fn get_considered_nodes(&self) -> Vec<Box<crate::maze::MazeNode<'a>>> {
+    fn get_considered_nodes(&self) -> Vec<Box<crate::maze::MazeNode>> {
         self.0.iter().filter_map(|path| path.last().map(|node| Box::new(node.clone()))).collect()
     }
 
-    fn develop_next_node(&mut self) -> Option<crate::maze::MazeNode<'a>> {
+    fn develop_next_node(&mut self) -> Option<crate::maze::MazeNode> {
         let path = self.0.pop_front()?.to_owned();
         let node = path.last()?.clone();
         
-        let mut new_paths = path.deepen_path().into_iter().collect::<LinkedList<Path<'a>>>();
+        let mut new_paths = path.deepen_path().into_iter().collect::<LinkedList<Path>>();
         self.0.append(&mut new_paths);
         Some(node)
     }
 }
 
-impl<'a> Iterator for BreadthFirstSearcher<'a> {
-    type Item = crate::maze::MazeNode<'a>;
+impl Iterator for BreadthFirstSearcher {
+    type Item = crate::maze::MazeNode;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.develop_next_node()
