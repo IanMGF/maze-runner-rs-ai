@@ -2,7 +2,6 @@ use maze_runner_rs::maze::{Maze, MazeNode};
 use maze_runner_rs::search::a_star::AStarSearcher;
 use maze_runner_rs::search::bfs::BreadthFirstSearcher;
 use maze_runner_rs::search::dfs::DepthFirstSearcher;
-use maze_runner_rs::search::path::Path;
 use maze_runner_rs::search::Searcher;
 use maze_runner_rs::tilemap::TileMap;
 use std::collections::HashMap;
@@ -56,18 +55,16 @@ async fn main() {
 
     #[allow(clippy::expect_used)]
     let mut searcher = {
-        let mut path = Path::new();
-        path.push(maze.get_start());
-        
+
         let algorithm: Box<dyn Searcher> = match algorithm_str.as_str() {
-            "dfs" => Box::new(DepthFirstSearcher::new(path)),
-            "bfs" => Box::new(BreadthFirstSearcher::new(path)),
+            "dfs" => Box::new(DepthFirstSearcher::new(maze.clone())),
+            "bfs" => Box::new(BreadthFirstSearcher::new(maze.clone())),
             "a-star" => {
                 let heuristic = Box::new(
                     |node: &MazeNode, end_node: &MazeNode| 
                     (Maze::manhattan_distance(node.get_coordinates(), end_node.get_coordinates())) as u64
                 );
-                Box::new(AStarSearcher::new(maze.clone(), path, heuristic).expect("Failed to create A* searcher"))
+                Box::new(AStarSearcher::new(maze.clone(), heuristic).expect("Failed to create A* searcher"))
             },
             _ => {
                 eprintln!("Invalid algorithm");

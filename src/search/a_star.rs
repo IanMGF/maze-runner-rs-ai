@@ -4,18 +4,26 @@ use crate::maze::Maze;
 
 use super::{path::Path, MazeNode, Searcher};
 
-pub trait HeuristicFn: Fn(&MazeNode, &MazeNode) -> u64 {}
-impl<T> HeuristicFn for T where T: Fn(&MazeNode, &MazeNode) -> u64 {}
+type Cost = u64;
 
-pub struct AStarSearcher<F> (Rc<Maze>, VecDeque<(Path, u64, u64)>, Box<F>) where F: HeuristicFn;
+// Fn(current_node, end_node) -> heuristical_cost;
+pub trait HeuristicFn: Fn(&MazeNode, &MazeNode) -> Cost {}
+impl<T> HeuristicFn for T where T: Fn(&MazeNode, &MazeNode) -> Cost {}
+
+pub struct AStarSearcher<F> (Rc<Maze>, VecDeque<(Path, Cost, Cost)>, Box<F>) where F: HeuristicFn;
 
 impl<F: HeuristicFn> AStarSearcher<F> {
-    pub fn new(maze: Rc<Maze>, initial_path: Path, heuristic: Box<F>) -> Option<AStarSearcher<F>> {
-        let start_node = initial_path.last()?;
-        let initial_path_length = initial_path.iter().len() as u64;
-        let starting_heuristic = heuristic(start_node, &maze.get_end());
+    pub fn new(maze: Rc<Maze>, heuristic: Box<F>) -> Option<AStarSearcher<F>> {
+        let start_node = maze.get_start();
+        
+        let mut initial_path: Path = Path::new();
+        initial_path.push(start_node.clone());
+        
+        let initial_path_length = 0 as Cost;
+        let starting_heuristic = heuristic(&start_node, &maze.get_end());
         
         let initial_path_list = [(initial_path, initial_path_length, starting_heuristic)].into();
+        
         Some(AStarSearcher(maze, initial_path_list, heuristic))
     }
 }
@@ -49,7 +57,7 @@ impl<F: HeuristicFn> super::Searcher for AStarSearcher<F> {
                 let node_heuristic = self.2(path.last().expect("Path is empty!"), &self.0.get_end());
                 (path, cost + 1, node_heuristic)
             })
-            .collect::<VecDeque<(Path, u64, u64)>>();
+            .collect::<VecDeque<(Path, Cost, Cost)>>();
         self.1.append(&mut new_paths);
         Some(node)
     }

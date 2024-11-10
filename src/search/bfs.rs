@@ -1,11 +1,15 @@
-use std::collections::LinkedList;
+use std::{collections::LinkedList, rc::Rc};
+
+use crate::maze::Maze;
 
 use super::{path::Path, Searcher};
 
 pub struct BreadthFirstSearcher (LinkedList<Path>);
 
 impl BreadthFirstSearcher {
-    pub fn new(initial_path: Path) -> BreadthFirstSearcher {
+    pub fn new(maze: Rc<Maze>) -> BreadthFirstSearcher {
+        let mut initial_path = Path::new();
+        initial_path.push(maze.get_start());
         BreadthFirstSearcher([initial_path].into())
     }
 }

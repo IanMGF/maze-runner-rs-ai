@@ -1,9 +1,15 @@
+use std::rc::Rc;
+
+use crate::maze::Maze;
+
 use super::{path::Path, Searcher};
 
 pub struct DepthFirstSearcher (Vec<Path>);
 
 impl DepthFirstSearcher {
-    pub fn new(initial_path: Path) -> DepthFirstSearcher {
+    pub fn new(maze: Rc<Maze>) -> DepthFirstSearcher {
+        let mut initial_path = Path::new();
+        initial_path.push(maze.get_start());
         DepthFirstSearcher(vec![initial_path])
     }
 }
