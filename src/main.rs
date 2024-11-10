@@ -22,7 +22,6 @@ enum EmptyTileState {
 
 #[macroquad::main("Maze Runner")]
 async fn main() {
-    println!("Size of MazeNode: {}", std::mem::size_of::<MazeNode>());
     let args: Vec<String> = env::args().collect();
 
     let Some(filepath) = args.get(1) else {
@@ -87,87 +86,8 @@ async fn main() {
         // Draw
         draw_time += delta_time;
         if draw_time >= DRAW_DELAY {
-            // O(1)
-            
-            #[cfg(debug_assertions)]
-            let render_start_time = get_time();
-            
-            draw_time = 0f64;
-            // clear_background(BLACK);
-            let tile_size = f32::min(
-                screen_width() / maze.width() as f32,
-                screen_height() / maze.height() as f32,
-            );
-
-            let x_offset = (screen_width() - (tile_size * maze.width() as f32)) / 2f32;
-            let y_offset = (screen_height() - (tile_size * maze.height() as f32)) / 2f32;
-
-            // O(n^2)
-            for x_idx in 0..maze.width() {
-                let mut streak: u16 = 1;
-                let mut streak_start: u16 = 0;
-                let mut streak_color: Option<Color> = None;
-                
-                for y_idx in 0..maze.height() {
-                    let x_pos = x_offset + (x_idx as f32) * tile_size;
-
-                    #[allow(clippy::expect_used)]
-                    let tile = maze
-                        .get_node((x_idx, y_idx))
-                        .expect("Empty node should not be accessible")
-                        .get_tile();
-
-                    let node_color: Option<Color> = match tile {
-                        maze_runner_rs::tilemap::Tile::Empty => {
-                            match empty_tile_states.get(&(x_idx, y_idx)) {
-                                None => None,
-                                Some(EmptyTileState::Visited) => Some(SKYBLUE),
-                                Some(EmptyTileState::Focused) => Some(ORANGE),
-                                Some(EmptyTileState::Considering) => Some(RED),
-                            }
-                        }
-                        maze_runner_rs::tilemap::Tile::Wall => Some(WHITE),
-                        maze_runner_rs::tilemap::Tile::Start => Some(YELLOW),
-                        maze_runner_rs::tilemap::Tile::End => Some(GREEN),
-                    };
-
-                    match (streak_color, node_color) {
-                        (None, new_color) => {
-                            streak = 1;
-                            streak_start = y_idx as u16;
-                            streak_color = new_color;
-                        }
-                        (Some(streak_col), Some(node_col)) if streak_col == node_col => {
-                            streak += 1;
-                        }
-                        (Some(streak_col), node_col_opt) if Some(streak_col) != node_col_opt => {
-                            let org_y = y_offset + streak_start as f32 * tile_size;
-                            draw_rectangle(x_pos, org_y, tile_size, tile_size * streak as f32, streak_col);
-                            
-                            streak_color = node_col_opt;
-                            streak = 1;
-                            streak_start = y_idx as u16;
-                        }
-                        (Some(_), _) => unreachable!("Invalid state"),
-                    }
-                }
-                
-                if let Some(color) = streak_color {
-                    let org_y = y_offset + streak_start as f32 * tile_size;
-                    draw_rectangle(
-                        x_offset + (x_idx as f32) * tile_size,
-                        org_y,
-                        tile_size,
-                        tile_size * streak as f32,
-                        color,
-                    );
-                }
-            }
-
-            next_frame().await;
-            
-            #[cfg(debug_assertions)]
-            println!("Render time: {}", get_time() - render_start_time);
+            draw_time = 0.;
+            draw(&maze, &mut empty_tile_states).await;
         }
         delta_time = get_time() - new_time;
     }
@@ -206,4 +126,85 @@ fn step(searcher: &mut Box<dyn Searcher>, empty_tile_states: &mut HashMap<(usize
         println!("Path found!");
         true
     }
+}
+
+async fn draw(maze: &Rc<Maze>, empty_tile_states: &mut HashMap<(usize, usize), EmptyTileState>){
+    #[cfg(debug_assertions)]
+    let render_start_time = get_time();
+    
+    // clear_background(BLACK);
+    let tile_size = f32::min(
+        screen_width() / maze.width() as f32,
+        screen_height() / maze.height() as f32,
+    );
+
+    let x_offset = (screen_width() - (tile_size * maze.width() as f32)) / 2f32;
+    let y_offset = (screen_height() - (tile_size * maze.height() as f32)) / 2f32;
+
+    // O(n^2)
+    for x_idx in 0..maze.width() {
+        let mut streak: u16 = 1;
+        let mut streak_start: u16 = 0;
+        let mut streak_color: Option<Color> = None;
+        
+        for y_idx in 0..maze.height() {
+            let x_pos = x_offset + (x_idx as f32) * tile_size;
+
+            #[allow(clippy::expect_used)]
+            let tile = maze
+                .get_node((x_idx, y_idx))
+                .expect("Empty node should not be accessible")
+                .get_tile();
+
+            let node_color: Option<Color> = match tile {
+                maze_runner_rs::tilemap::Tile::Empty => {
+                    match empty_tile_states.get(&(x_idx, y_idx)) {
+                        None => None,
+                        Some(EmptyTileState::Visited) => Some(SKYBLUE),
+                        Some(EmptyTileState::Focused) => Some(ORANGE),
+                        Some(EmptyTileState::Considering) => Some(RED),
+                    }
+                }
+                maze_runner_rs::tilemap::Tile::Wall => Some(WHITE),
+                maze_runner_rs::tilemap::Tile::Start => Some(YELLOW),
+                maze_runner_rs::tilemap::Tile::End => Some(GREEN),
+            };
+
+            match (streak_color, node_color) {
+                (None, new_color) => {
+                    streak = 1;
+                    streak_start = y_idx as u16;
+                    streak_color = new_color;
+                }
+                (Some(streak_col), Some(node_col)) if streak_col == node_col => {
+                    streak += 1;
+                }
+                (Some(streak_col), node_col_opt) if Some(streak_col) != node_col_opt => {
+                    let org_y = y_offset + streak_start as f32 * tile_size;
+                    draw_rectangle(x_pos, org_y, tile_size, tile_size * streak as f32, streak_col);
+                    
+                    streak_color = node_col_opt;
+                    streak = 1;
+                    streak_start = y_idx as u16;
+                }
+                (Some(_), _) => unreachable!("Invalid state"),
+            }
+        }
+        
+        if let Some(color) = streak_color {
+            let org_y = y_offset + streak_start as f32 * tile_size;
+            draw_rectangle(
+                x_offset + (x_idx as f32) * tile_size,
+                org_y,
+                tile_size,
+                tile_size * streak as f32,
+                color,
+            );
+        }
+    }
+
+    next_frame().await;
+    
+    #[cfg(debug_assertions)]
+    println!("Render time: {}", get_time() - render_start_time);
 }
