@@ -4,7 +4,7 @@ use crate::maze::Maze;
 
 use super::{path::Path, Searcher};
 
-pub struct DepthFirstSearcher (Vec<Path>);
+pub struct DepthFirstSearcher(Vec<Path>);
 
 impl DepthFirstSearcher {
     pub fn new(maze: Rc<Maze>) -> DepthFirstSearcher {
@@ -17,9 +17,12 @@ impl super::Searcher for DepthFirstSearcher {
     fn get_current_path(&self) -> Option<&Path> {
         self.0.last()
     }
-    
-    fn get_considered_nodes(&self) -> Vec<Box<crate::maze::MazeNode>> {
-        self.0.iter().filter_map(|path| path.last().map(|node| Box::new(node.clone()))).collect()
+
+    fn get_considered_nodes(&self) -> Vec<crate::maze::MazeNode> {
+        self.0
+            .iter()
+            .filter_map(|path| path.last().cloned())
+            .collect()
     }
 
     fn develop_next_node(&mut self) -> Option<crate::maze::MazeNode> {
