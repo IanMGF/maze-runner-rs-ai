@@ -52,7 +52,6 @@ async fn main() {
 
     let mut empty_tile_states: HashMap<(usize, usize), EmptyTileState> = HashMap::new();
 
-    #[allow(clippy::expect_used)]
     let mut searcher = {
 
         let algorithm: Box<dyn Searcher> = match algorithm_str.as_str() {
@@ -63,7 +62,7 @@ async fn main() {
                     |node: &MazeNode, end_node: &MazeNode| 
                     (Maze::manhattan_distance(node.get_coordinates(), end_node.get_coordinates())) as u64
                 );
-                Box::new(AStarSearcher::new(maze.clone(), heuristic).expect("Failed to create A* searcher"))
+                Box::new(AStarSearcher::new(maze.clone(), heuristic))
             },
             _ => {
                 eprintln!("Invalid algorithm");
@@ -114,13 +113,21 @@ fn step(searcher: &mut Box<dyn Searcher>, empty_tile_states: &mut HashMap<(usize
             empty_tile_states.insert(node.get_coordinates(), EmptyTileState::Considering);
         });
         
-        searcher.get_current_path().expect("No more paths").iter().for_each(|node| {
-            empty_tile_states.insert(node.get_coordinates(), EmptyTileState::Focused);
-        });
+        if let Some(current_path) = searcher.get_current_path() {
+            current_path.iter().for_each(|node| {
+                empty_tile_states.insert(node.get_coordinates(), EmptyTileState::Focused);
+            });
+            
+            #[cfg(debug_assertions)]
+            println!("Step time: {}", get_time() - step_start_time);
+            false
+        } else {
+            #[cfg(debug_assertions)]
+            println!("Step time: {}", get_time() - step_start_time);
+            eprintln!("No path found");
+            true
+        }
         
-        #[cfg(debug_assertions)]
-        println!("Step time: {}", get_time() - step_start_time);
-        false
     } else {
         #[cfg(debug_assertions)]
         println!("Path found!");
@@ -143,9 +150,16 @@ async fn draw(maze: &Rc<Maze>, empty_tile_states: &mut HashMap<(usize, usize), E
 
     // O(n^2)
     for x_idx in 0..maze.width() {
-        let mut streak: u16 = 1;
-        let mut streak_start: u16 = 0;
-        let mut streak_color: Option<Color> = None;
+        struct TileStreak {
+            start_idx: usize,
+            length: usize,
+            color: Option<Color>,
+        }
+        let mut streak: TileStreak = TileStreak {
+            start_idx: 0,
+            length: 1,
+            color: None,
+        };
         
         for y_idx in 0..maze.height() {
             let x_pos = x_offset + (x_idx as f32) * tile_size;
@@ -170,34 +184,39 @@ async fn draw(maze: &Rc<Maze>, empty_tile_states: &mut HashMap<(usize, usize), E
                 maze_runner_rs::tilemap::Tile::End => Some(GREEN),
             };
 
-            match (streak_color, node_color) {
+            match (streak.color, node_color) {
                 (None, new_color) => {
-                    streak = 1;
-                    streak_start = y_idx as u16;
-                    streak_color = new_color;
+                    streak = TileStreak {
+                        start_idx: y_idx,
+                        length: 1,
+                        color: new_color,
+                    };
                 }
                 (Some(streak_col), Some(node_col)) if streak_col == node_col => {
-                    streak += 1;
+                    streak.length += 1;
                 }
                 (Some(streak_col), node_col_opt) if Some(streak_col) != node_col_opt => {
-                    let org_y = y_offset + streak_start as f32 * tile_size;
-                    draw_rectangle(x_pos, org_y, tile_size, tile_size * streak as f32, streak_col);
+                    let org_y = y_offset + streak.start_idx as f32 * tile_size;
+                    draw_rectangle(x_pos, org_y, tile_size, tile_size * streak.length as f32, streak_col);
                     
-                    streak_color = node_col_opt;
-                    streak = 1;
-                    streak_start = y_idx as u16;
+                    streak = TileStreak {
+                        start_idx: y_idx,
+                        length: 1,
+                        color: node_col_opt,
+                    };
                 }
                 (Some(_), _) => unreachable!("Invalid state"),
             }
         }
         
-        if let Some(color) = streak_color {
-            let org_y = y_offset + streak_start as f32 * tile_size;
+        if let Some(color) = streak.color {
+            let org_y = y_offset + streak.start_idx as f32 * tile_size;
+            let height = tile_size * streak.length as f32;
             draw_rectangle(
                 x_offset + (x_idx as f32) * tile_size,
                 org_y,
                 tile_size,
-                tile_size * streak as f32,
+                height,
                 color,
             );
         }

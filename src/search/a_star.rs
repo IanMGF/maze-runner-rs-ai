@@ -13,7 +13,7 @@ impl<T> HeuristicFn for T where T: Fn(&MazeNode, &MazeNode) -> Cost {}
 pub struct AStarSearcher<F> (Rc<Maze>, VecDeque<(Path, Cost, Cost)>, Box<F>) where F: HeuristicFn;
 
 impl<F: HeuristicFn> AStarSearcher<F> {
-    pub fn new(maze: Rc<Maze>, heuristic: Box<F>) -> Option<AStarSearcher<F>> {
+    pub fn new(maze: Rc<Maze>, heuristic: Box<F>) -> AStarSearcher<F> {
         let start_node = maze.get_start();
         
         let mut initial_path: Path = Path::new();
@@ -24,7 +24,7 @@ impl<F: HeuristicFn> AStarSearcher<F> {
         
         let initial_path_list = [(initial_path, initial_path_length, starting_heuristic)].into();
         
-        Some(AStarSearcher(maze, initial_path_list, heuristic))
+        AStarSearcher(maze, initial_path_list, heuristic)
     }
 }
 
@@ -41,9 +41,10 @@ impl<F: HeuristicFn> super::Searcher for AStarSearcher<F> {
             .collect()
     }
 
+    #[allow(clippy::expect_used)]
     fn develop_next_node(&mut self) -> Option<crate::maze::MazeNode> {
         let (idx, _) = self.1.iter().enumerate().min_by_key(|(_, (_, cost, heuristic))| heuristic + cost)?;
-        let (path, cost, _) = self.1.remove(idx)?;
+        let (path, cost, _) = self.1.remove(idx).expect("Index out of bounds!");
         
         let node = path.last()?.clone();
         
@@ -53,7 +54,6 @@ impl<F: HeuristicFn> super::Searcher for AStarSearcher<F> {
         let mut new_paths = path.deepen_path()
             .into_iter()
             .map(|path| {
-                #[allow(clippy::expect_used)]
                 let node_heuristic = self.2(path.last().expect("Path is empty!"), &self.0.get_end());
                 (path, cost + 1, node_heuristic)
             })
