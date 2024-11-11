@@ -1,12 +1,12 @@
-use std::collections::{linked_list::Iter, LinkedList};
+use std::collections::{vec_deque::Iter, VecDeque};
 
 use crate::maze::MazeNode;
 
 #[derive(Clone, Debug)]
-pub struct Path(LinkedList<MazeNode>);
+pub struct Path(VecDeque<MazeNode>);
 impl Path {
     pub fn new() -> Path {
-        Path(LinkedList::new())
+        Path(VecDeque::new())
     }
     
     pub fn push(&mut self, node: MazeNode) {

@@ -1,10 +1,10 @@
-use std::{collections::LinkedList, rc::Rc};
+use std::{collections::VecDeque, rc::Rc};
 
 use crate::maze::Maze;
 
 use super::{path::Path, Searcher};
 
-pub struct BreadthFirstSearcher (LinkedList<Path>);
+pub struct BreadthFirstSearcher (VecDeque<Path>);
 
 impl BreadthFirstSearcher {
     pub fn new(maze: Rc<Maze>) -> BreadthFirstSearcher {
@@ -27,7 +27,7 @@ impl super::Searcher for BreadthFirstSearcher {
         let path = self.0.pop_front()?.to_owned();
         let node = path.last()?.clone();
         
-        let mut new_paths = path.deepen_path().into_iter().collect::<LinkedList<Path>>();
+        let mut new_paths = path.deepen_path().into_iter().collect::<VecDeque<Path>>();
         self.0.append(&mut new_paths);
         Some(node)
     }

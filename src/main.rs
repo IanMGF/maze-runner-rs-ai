@@ -1,8 +1,6 @@
 use maze_runner_rs::maze::{Maze, MazeNode};
-use maze_runner_rs::search::a_star::AStarSearcher;
-use maze_runner_rs::search::bfs::BreadthFirstSearcher;
-use maze_runner_rs::search::dfs::DepthFirstSearcher;
 use maze_runner_rs::search::Searcher;
+use maze_runner_rs::search::{a_star, bfs, dfs};
 use maze_runner_rs::tilemap::TileMap;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -11,7 +9,7 @@ use std::{env, fs};
 use macroquad::prelude::*;
 
 const STEP_DELAY: f64 = 0.;
-const DRAW_DELAY: f64 = 1. / 60.;
+const DRAW_DELAY: f64 = 1. / 24.;
 
 #[derive(PartialEq, Eq)]
 enum EmptyTileState {
@@ -29,7 +27,7 @@ async fn main() {
         return;
     };
     
-    let algorithm_str = args.get(2).cloned().unwrap_or(String::from("dfs"));
+    let algorithm_str = args.get(2).cloned().unwrap_or(String::from("a-star"));
 
     let Ok(tilemap_str) = fs::read_to_string(filepath) else {
         eprintln!("File not found: {filepath}");
@@ -45,27 +43,27 @@ async fn main() {
 
     let mut done = false;
     let mut new_time: f64;
-    let mut delta_time: f64 = 1f64 / 60f64;
+    let mut delta_time: f64 = STEP_DELAY;
 
-    let mut step_time = 0f64;
-    let mut draw_time = 0f64;
+    let mut step_time = 0.;
+    let mut draw_time = 0.;
 
     let mut empty_tile_states: HashMap<(usize, usize), EmptyTileState> = HashMap::new();
 
     let mut searcher = {
 
         let algorithm: Box<dyn Searcher> = match algorithm_str.as_str() {
-            "dfs" => Box::new(DepthFirstSearcher::new(maze.clone())),
-            "bfs" => Box::new(BreadthFirstSearcher::new(maze.clone())),
+            "dfs" => Box::new(dfs::DepthFirstSearcher::new(maze.clone())),
+            "bfs" => Box::new(bfs::BreadthFirstSearcher::new(maze.clone())),
             "a-star" => {
                 let heuristic = Box::new(
                     |node: &MazeNode, end_node: &MazeNode| 
                     (Maze::manhattan_distance(node.get_coordinates(), end_node.get_coordinates())) as u64
                 );
-                Box::new(AStarSearcher::new(maze.clone(), heuristic))
+                Box::new(a_star::AStarSearcher::new(maze.clone(), heuristic))
             },
             _ => {
-                eprintln!("Invalid algorithm");
+                eprintln!("Invalid algorithm: Expected \"dfs\", \"bfs\" or \"a-star\", got \"{}\"", algorithm_str);
                 return;
             }
         };
@@ -98,39 +96,37 @@ fn step(searcher: &mut Box<dyn Searcher>, empty_tile_states: &mut HashMap<(usize
     let step_start_time = get_time();
 
     let Some(node) = searcher.next() else {
-        panic!("No more nodes to search");
+        eprintln!("No node left to expand");
+        return false;
     };
 
-    #[allow(clippy::expect_used)]
-    if node.get_tile() != maze_runner_rs::tilemap::Tile::End {
-        empty_tile_states.iter_mut().for_each(|(_, state)| {
-            if *state == EmptyTileState::Focused {
-                *state = EmptyTileState::Visited;
-            }
-        });
-        
-        searcher.get_considered_nodes().iter().for_each(|node| {
-            empty_tile_states.insert(node.get_coordinates(), EmptyTileState::Considering);
-        });
-        
-        if let Some(current_path) = searcher.get_current_path() {
-            current_path.iter().for_each(|node| {
-                empty_tile_states.insert(node.get_coordinates(), EmptyTileState::Focused);
-            });
-            
-            #[cfg(debug_assertions)]
-            println!("Step time: {}", get_time() - step_start_time);
-            false
-        } else {
-            #[cfg(debug_assertions)]
-            println!("Step time: {}", get_time() - step_start_time);
-            eprintln!("No path found");
-            true
-        }
-        
-    } else {
+    if node.get_tile() == maze_runner_rs::tilemap::Tile::End {
         #[cfg(debug_assertions)]
         println!("Path found!");
+        return true;
+    }
+    
+    empty_tile_states
+        .iter_mut()
+        .filter(|(_, state)| **state == EmptyTileState::Focused)
+        .for_each(|(_, state)| *state = EmptyTileState::Visited);
+    
+    searcher.get_considered_nodes().iter().for_each(|node| {
+        empty_tile_states.insert(node.get_coordinates(), EmptyTileState::Considering);
+    });
+    
+    if let Some(current_path) = searcher.get_current_path() {
+        current_path.iter().for_each(|node| {
+            empty_tile_states.insert(node.get_coordinates(), EmptyTileState::Focused);
+        });
+        
+        #[cfg(debug_assertions)]
+        println!("Step time: {}", get_time() - step_start_time);
+        false
+    } else {
+        #[cfg(debug_assertions)]
+        println!("Step time: {}", get_time() - step_start_time);
+        eprintln!("No path found");
         true
     }
 }
@@ -147,14 +143,14 @@ async fn draw(maze: &Rc<Maze>, empty_tile_states: &mut HashMap<(usize, usize), E
 
     let x_offset = (screen_width() - (tile_size * maze.width() as f32)) / 2f32;
     let y_offset = (screen_height() - (tile_size * maze.height() as f32)) / 2f32;
-
-    // O(n^2)
+    
+    struct TileStreak {
+        start_idx: usize,
+        length: usize,
+        color: Option<Color>,
+    }
+    
     for x_idx in 0..maze.width() {
-        struct TileStreak {
-            start_idx: usize,
-            length: usize,
-            color: Option<Color>,
-        }
         let mut streak: TileStreak = TileStreak {
             start_idx: 0,
             length: 1,
@@ -184,29 +180,29 @@ async fn draw(maze: &Rc<Maze>, empty_tile_states: &mut HashMap<(usize, usize), E
                 maze_runner_rs::tilemap::Tile::End => Some(GREEN),
             };
 
-            match (streak.color, node_color) {
-                (None, new_color) => {
-                    streak = TileStreak {
-                        start_idx: y_idx,
-                        length: 1,
-                        color: new_color,
-                    };
-                }
-                (Some(streak_col), Some(node_col)) if streak_col == node_col => {
-                    streak.length += 1;
-                }
+            streak = match (streak.color, node_color) {
+                (None, new_color) => TileStreak {
+                    start_idx: y_idx,
+                    length: 1,
+                    color: new_color,
+                },
+                (Some(streak_col), Some(node_col)) if streak_col == node_col => TileStreak {
+                    start_idx: streak.start_idx,
+                    length: streak.length + 1,
+                    color: Some(streak_col),
+                },
                 (Some(streak_col), node_col_opt) if Some(streak_col) != node_col_opt => {
                     let org_y = y_offset + streak.start_idx as f32 * tile_size;
                     draw_rectangle(x_pos, org_y, tile_size, tile_size * streak.length as f32, streak_col);
                     
-                    streak = TileStreak {
+                    TileStreak {
                         start_idx: y_idx,
                         length: 1,
                         color: node_col_opt,
-                    };
+                    }
                 }
                 (Some(_), _) => unreachable!("Invalid state"),
-            }
+            };
         }
         
         if let Some(color) = streak.color {
