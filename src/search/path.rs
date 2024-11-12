@@ -36,12 +36,6 @@ impl Path {
 
         let neighbors = node.get_neighbors();
 
-        // let next_nodes: Vec<MazeNode> = vec![
-        //     neighbors.up,
-        //     neighbors.left,
-        //     neighbors.down,
-        //     neighbors.right
-        // ].into_iter().flatten().filter(|node| !self.contains(node)).collect();
         let next_nodes: Vec<MazeNode> = neighbors
             .into_iter()
             .filter(|node| !self.contains(node))

@@ -43,7 +43,7 @@ impl Iterator for NeighboursIter {
     type Item = MazeNode;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // 
+        //
         None.or_else(|| self.0.up.take())
             .or_else(|| self.0.left.take())
             .or_else(|| self.0.down.take())

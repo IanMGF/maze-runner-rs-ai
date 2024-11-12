@@ -9,7 +9,7 @@ use std::{env, fs};
 use macroquad::prelude::*;
 
 const STEP_DELAY: f64 = 0.;
-const DRAW_DELAY: f64 = 1. / 24.;
+const DRAW_DELAY: f64 = 1. / 120.;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 enum EmptyTileState {
@@ -50,6 +50,11 @@ async fn main() {
 
     let mut empty_tile_states: HashMap<Coordinates, EmptyTileState> = HashMap::new();
 
+    #[cfg(debug_assertions)]
+    let mut steps = 0f64;
+    #[cfg(debug_assertions)]
+    let mut total_step_time = 0f64;
+
     let mut searcher: Box<dyn Searcher> = match algorithm_str.as_str() {
         "dfs" => Box::new(dfs::DepthFirstSearcher::new(maze.clone())),
         "bfs" => Box::new(bfs::BreadthFirstSearcher::new(maze.clone())),
@@ -76,6 +81,15 @@ async fn main() {
         if step_timer >= STEP_DELAY && !done {
             step_timer = 0.;
             done = step(&mut searcher, &mut empty_tile_states);
+            #[cfg(debug_assertions)]
+            {
+                steps += 1f64;
+                total_step_time += get_time() - new_time;
+                if done {
+                    #[cfg(debug_assertions)]
+                    println!("Average step time: {:?}", total_step_time / steps)
+                }
+            }
         }
 
         draw_timer += delta_time;
@@ -92,9 +106,6 @@ fn step(
     searcher: &mut Box<dyn Searcher>,
     empty_tile_states: &mut HashMap<Coordinates, EmptyTileState>,
 ) -> bool {
-    #[cfg(debug_assertions)]
-    let step_start_time = get_time();
-
     let Some(node) = searcher.next() else {
         eprintln!("No node left to expand");
         return false;
@@ -123,25 +134,14 @@ fn step(
                 .map(MazeNode::get_coordinates)
                 .zip(std::iter::repeat(EmptyTileState::Focused)),
         );
-
-        #[cfg(debug_assertions)]
-        println!("Step time: {}", get_time() - step_start_time);
-
         false
     } else {
-        #[cfg(debug_assertions)]
-        println!("Step time: {}", get_time() - step_start_time);
-
         eprintln!("No path found");
         true
     }
 }
 
 async fn draw(maze: &Rc<Maze>, empty_tile_states: &mut HashMap<Coordinates, EmptyTileState>) {
-    #[cfg(debug_assertions)]
-    let render_start_time = get_time();
-
-    // clear_background(BLACK);
     let tile_size = f32::min(
         screen_width() / maze.width() as f32,
         screen_height() / maze.height() as f32,
@@ -231,7 +231,4 @@ async fn draw(maze: &Rc<Maze>, empty_tile_states: &mut HashMap<Coordinates, Empt
     }
 
     next_frame().await;
-
-    #[cfg(debug_assertions)]
-    println!("Render time: {}", get_time() - render_start_time);
 }
