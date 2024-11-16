@@ -4,12 +4,14 @@ use crate::maze::Maze;
 
 use super::{path::Path, MazeNode, Searcher};
 
+// Type-alias "cost" for better semantics
 type Cost = u64;
 
 // Fn(current_node, end_node) -> heuristical_cost;
 pub trait HeuristicFn: Fn(&MazeNode, &MazeNode) -> Cost {}
 impl<T> HeuristicFn for T where T: Fn(&MazeNode, &MazeNode) -> Cost {}
 
+// The A* searcher will store a vector of tuples, each with a path, the cost of the path, and the predicted cost from the last node to the end node.
 pub struct AStarSearcher<F>(Rc<Maze>, VecDeque<(Path, Cost, Cost)>, Box<F>)
 where
     F: HeuristicFn;
@@ -31,21 +33,24 @@ impl<F: HeuristicFn> AStarSearcher<F> {
 }
 
 impl<F: HeuristicFn> super::Searcher for AStarSearcher<F> {
+    // To get the current path, we will return the path with the lowest cost + heuristic.
     fn get_current_path(&self) -> Option<&Path> {
-        self.1.iter().len();
         self.1
             .iter()
             .min_by_key(|(_, cost, heuristic)| heuristic + cost)
             .map(|(path, _, _)| path)
     }
 
+    // To get the considered nodes, return the neighbours of the last node of each path.
     fn get_considered_nodes(&self) -> Vec<MazeNode> {
         self.1
             .iter()
-            .filter_map(|(path, _, _)| path.last().cloned())
+            .filter_map(|(path, _, _)| (path.last().cloned()))
+            .flat_map(|node| node.get_neighbors())
             .collect()
     }
 
+    // To develop the next node, we will take the path with the lowest cost + heuristic, and deepen it.
     #[allow(clippy::expect_used)]
     fn develop_next_node(&mut self) -> Option<MazeNode> {
         let (idx, _) = self

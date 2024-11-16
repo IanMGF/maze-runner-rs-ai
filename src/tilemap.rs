@@ -6,6 +6,13 @@ pub enum Tile {
     End,
 }
 
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum EmptyTileState {
+    Focused,
+    Visited,
+    Considering,
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct TileMap(Vec<Vec<Tile>>);
 pub struct TileMapIter(TileMap, usize);

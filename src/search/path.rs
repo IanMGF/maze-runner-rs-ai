@@ -29,13 +29,14 @@ impl Path {
         self.0.contains(node)
     }
 
+    // The deepen_path method is used to create new paths from the current path.
     pub fn deepen_path(self) -> Vec<Path> {
+        // Get the last node in the path, if none return itself
         let Some(node) = self.0.back() else {
             return [self].into();
         };
 
         let neighbors = node.get_neighbors();
-
         let next_nodes: Vec<MazeNode> = neighbors
             .into_iter()
             .filter(|node| !self.contains(node))

@@ -39,6 +39,7 @@ impl IntoIterator for Neighbours {
     }
 }
 
+// The NeighboursIter struct is an iterator over the Neighbours struct, in the order up, left, down, right.
 impl Iterator for NeighboursIter {
     type Item = MazeNode;
 
